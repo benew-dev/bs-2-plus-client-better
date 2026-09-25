@@ -1,8 +1,7 @@
 import path, { dirname } from "path";
 import { fileURLToPath } from "url";
 
-import pkg from "@sentry/nextjs";
-const { withSentryConfig } = pkg;
+import { withSentryConfig } from "@sentry/nextjs/config";
 import withBundleAnalyzer from "@next/bundle-analyzer";
 
 // ===== VALIDATION INTELLIGENTE DES VARIABLES D'ENVIRONNEMENT =====
