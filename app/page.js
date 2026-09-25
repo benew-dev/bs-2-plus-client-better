@@ -1,69 +1,98 @@
-import Image from "next/image";
+import Hero from "@/components/home/Hero";
 
-export default function Home() {
+export const metadata = {
+  title: "Buy It Now - Votre boutique en ligne de confiance",
+  description:
+    "Découvrez des milliers de produits de qualité à des prix imbattables. Livraison rapide et paiement sécurisé.",
+};
+
+/**
+ * Récupère les données de la page d'accueil depuis l'API
+ * Version optimisée avec cache long (les données changent rarement)
+ *
+ * @returns {Promise<Object>} Données de la homepage ou valeurs par défaut
+ */
+const getHomePageData = async () => {
+  try {
+    // 1. Construire l'URL de l'API
+    const apiUrl = `${
+      process.env.API_URL || "https://bs-plus-client-better.vercel.app"
+    }/api/homepage`;
+
+    console.log("Fetching homepage data from:", apiUrl);
+
+    // 2. Faire l'appel API avec timeout (5 secondes)
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+    const res = await fetch(apiUrl, {
+      signal: controller.signal,
+      next: {
+        revalidate: 3600, // Cache Next.js de 1 heure (données rarement modifiées)
+        tags: ["homepage"],
+      },
+    });
+
+    clearTimeout(timeoutId);
+
+    // 3. Vérifier le statut HTTP
+    if (!res.ok) {
+      console.error(`API Error: ${res.status} - ${res.statusText}`);
+
+      // Retourner des valeurs par défaut en cas d'erreur
+      return {
+        success: false,
+        message: "Erreur lors de la récupération des données",
+        data: null,
+      };
+    }
+
+    // 4. Parser la réponse JSON
+    const responseBody = await res.json();
+
+    // 5. Vérifier la structure de la réponse
+    if (!responseBody.success) {
+      console.error("Invalid API response structure:", responseBody);
+      return {
+        success: false,
+        message: responseBody.message || "Réponse API invalide",
+        data: null,
+      };
+    }
+
+    // 6. Retourner les données avec succès
+    return {
+      success: true,
+      message: "Données récupérées avec succès",
+      data: responseBody.data,
+    };
+  } catch (error) {
+    // 7. Gestion des erreurs réseau/timeout
+    if (error.name === "AbortError") {
+      console.error("Request timeout after 5 seconds");
+      return {
+        success: false,
+        message: "La requête a pris trop de temps",
+        data: null,
+      };
+    }
+
+    console.error("Network error:", error.message);
+    return {
+      success: false,
+      message: "Problème de connexion réseau",
+      data: null,
+    };
+  }
+};
+
+export default async function Home() {
+  // Récupérer les données de la homepage
+  const homePageData = await getHomePageData();
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.js
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+    <>
+      <Hero homePageData={homePageData.data} />
+    </>
   );
 }
