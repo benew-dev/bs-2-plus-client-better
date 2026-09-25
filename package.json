@@ -16,6 +16,7 @@
     "better-auth": "^1.7.6",
     "cloudinary": "^2.11.0",
     "countries-list": "^3.4.1",
+    "dompurify": "^3.4.16",
     "lucide-react": "^1.48.0",
     "mongoose": "^9.10.2",
     "mongoose-slug-updater": "^3.3.0",
