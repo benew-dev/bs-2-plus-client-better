@@ -1,7 +1,8 @@
 import path, { dirname } from "path";
 import { fileURLToPath } from "url";
 
-import { withSentryConfig } from "@sentry/nextjs";
+import pkg from "@sentry/nextjs";
+const { withSentryConfig } = pkg;
 import withBundleAnalyzer from "@next/bundle-analyzer";
 
 // ===== VALIDATION INTELLIGENTE DES VARIABLES D'ENVIRONNEMENT =====
@@ -17,7 +18,6 @@ const validateEnv = () => {
     - IS_BUILD_PHASE: ${IS_BUILD_PHASE}
   `);
 
-  // 📋 CATÉGORISATION DES VARIABLES
   const BUILD_TIME_VARS = [
     "NEXT_PUBLIC_SITE_URL",
     "NEXT_PUBLIC_API_URL",
@@ -48,24 +48,19 @@ const validateEnv = () => {
 
   const ALWAYS_REQUIRED = ["NODE_ENV"];
 
-  // 🎯 LOGIQUE DE VALIDATION SELON LE CONTEXTE
   let requiredVars = [];
 
   if (NODE_ENV === "development") {
-    // 🔧 DÉVELOPPEMENT : Validation permissive
     requiredVars = [...ALWAYS_REQUIRED];
     console.log("🔧 Dev mode: Basic validation only");
   } else if (IS_CI && NODE_ENV === "production") {
-    // 🏗️ BUILD CI/CD : Variables nécessaires au build
     requiredVars = [...ALWAYS_REQUIRED, ...BUILD_TIME_VARS];
     console.log("🏗️ CI Build mode: Validating BUILD_TIME_VARS");
   } else if (NODE_ENV === "production" && !IS_CI) {
-    // 🚀 PRODUCTION RUNTIME : Validation complète
     requiredVars = [...ALWAYS_REQUIRED, ...RUNTIME_VARS, ...BUILD_TIME_VARS];
     console.log("🚀 Production runtime: Validating ALL variables");
   }
 
-  // ✅ VÉRIFICATION DES VARIABLES
   const missingVars = requiredVars.filter((varName) => !process.env[varName]);
 
   if (missingVars.length > 0) {
@@ -74,7 +69,6 @@ const validateEnv = () => {
       `⚠️ [${context}] Missing environment variables: ${missingVars.join(", ")}`,
     );
 
-    // 🛡️ ÉCHEC STRICT EN PRODUCTION RUNTIME SEULEMENT
     if (NODE_ENV === "production" && !IS_CI) {
       throw new Error(
         `❌ Production runtime failed: Missing critical environment variables: ${missingVars.join(
@@ -103,18 +97,15 @@ const bundleAnalyzer = withBundleAnalyzer({
 });
 
 const nextConfig = {
-  // Configuration de base
   output: process.env.NODE_ENV === "production" ? "standalone" : undefined,
   poweredByHeader: false,
   reactStrictMode: true,
   compress: true,
 
-  // Configuration des packages externes
   serverExternalPackages: ["mongoose"],
 
-  // Configuration des images Cloudinary
   images: {
-    unoptimized: true, // Ajoute cette ligne
+    unoptimized: true,
     remotePatterns: [
       {
         protocol: "https",
@@ -124,61 +115,48 @@ const nextConfig = {
       },
     ],
     formats: ["image/avif", "image/webp"],
-    minimumCacheTTL: 86400, // 1 jour
+    minimumCacheTTL: 86400,
     deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
     imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
   },
 
-  // Configuration du compilateur
   compiler: {
     removeConsole:
       process.env.NODE_ENV === "production"
         ? {
-            exclude: ["error", "warn", "log"], // Garde error et warn en production
+            exclude: ["error", "warn", "log"],
           }
         : false,
   },
 
-  // Timeout pour la génération de pages statiques (réduit de 180 à 60)
   staticPageGenerationTimeout: 180,
-  // Configuration des headers de sécurité// next.config.js - Section headers optimisée
+
   async headers() {
     return [
-      // ============================================
-      // 1. HEADERS DE SÉCURITÉ GLOBAUX (toutes les pages HTML)
-      // ============================================
       {
         source: "/(.*)",
         headers: [
-          // HSTS - Force HTTPS (2 ans recommandé pour production)
           {
             key: "Strict-Transport-Security",
             value: "max-age=63072000; includeSubDomains; preload",
           },
-          // Protection Clickjacking (remplacé par CSP frame-ancestors mais gardé pour compatibilité)
           {
             key: "X-Frame-Options",
-            value: "SAMEORIGIN", // Changé de DENY pour permettre vos propres iframes si besoin
+            value: "SAMEORIGIN",
           },
-          // Protection contre le MIME sniffing
           {
             key: "X-Content-Type-Options",
             value: "nosniff",
           },
-          // Politique de referrer équilibrée (sécurité + analytics)
           {
             key: "Referrer-Policy",
             value: "strict-origin-when-cross-origin",
           },
-          // Permissions Policy - Désactive les APIs non nécessaires pour un e-commerce
-
-          // APRÈS (autorise Cloudinary)
           {
             key: "Permissions-Policy",
             value:
               "camera=(self https://upload-widget.cloudinary.com), microphone=(self https://upload-widget.cloudinary.com), geolocation=(), interest-cohort=(), payment=(self), usb=(), magnetometer=(), gyroscope=(), accelerometer=()",
           },
-          // CSP optimisé pour votre stack
           {
             key: "Content-Security-Policy",
             value: `
@@ -201,21 +179,17 @@ const nextConfig = {
               .replace(/\s{2,}/g, " ")
               .trim(),
           },
-          // Headers additionnels pour la sécurité
           {
             key: "X-DNS-Prefetch-Control",
             value: "on",
           },
           {
             key: "X-XSS-Protection",
-            value: "0", // Désactivé car déprécié et peut causer des vulnérabilités
+            value: "0",
           },
         ],
       },
 
-      // ============================================
-      // HOMEPAGE API - Cache long (données rarement modifiées)
-      // ============================================
       {
         source: "/api/homepage",
         headers: [
@@ -238,10 +212,6 @@ const nextConfig = {
         ],
       },
 
-      // ============================================
-      // 2. APIs PUBLIQUES (products, category)
-      // Appelées par Server Components (S2S)
-      // ============================================
       {
         source: "/api/(products|category|paymentPlatform)/:path*",
         headers: [
@@ -264,10 +234,6 @@ const nextConfig = {
         ],
       },
 
-      // ============================================
-      // 3. APIs D'AUTHENTIFICATION
-      // Sécurité maximale, jamais de cache
-      // ============================================
       {
         source: "/api/auth/:path*",
         headers: [
@@ -303,10 +269,6 @@ const nextConfig = {
         ],
       },
 
-      // ============================================
-      // 4. APIs PRIVÉES (cart, orders, address, emails)
-      // Données sensibles utilisateur
-      // ============================================
       {
         source: "/api/(address|cart|orders|emails)/:path*",
         headers: [
@@ -333,10 +295,6 @@ const nextConfig = {
         ],
       },
 
-      // ============================================
-      // 5. ASSETS STATIQUES NEXT.JS
-      // Cache immutable pour les builds
-      // ============================================
       {
         source: "/_next/static/:path*",
         headers: [
@@ -351,10 +309,6 @@ const nextConfig = {
         ],
       },
 
-      // ============================================
-      // 6. IMAGES STATIQUES LOCALES
-      // Dans votre dossier public/images
-      // ============================================
       {
         source: "/images/:path*",
         headers: [
@@ -373,9 +327,6 @@ const nextConfig = {
         ],
       },
 
-      // ============================================
-      // 7. FAVICONS ET ASSETS ROOT
-      // ============================================
       {
         source:
           "/(favicon.ico|icon-*.png|apple-touch-icon.png|robots.txt|sitemap.xml)",
@@ -387,9 +338,6 @@ const nextConfig = {
         ],
       },
 
-      // ============================================
-      // 8. SERVICE WORKER
-      // ============================================
       {
         source: "/sw.js",
         headers: [
@@ -404,9 +352,6 @@ const nextConfig = {
         ],
       },
 
-      // ============================================
-      // 9. MANIFEST PWA
-      // ============================================
       {
         source: "/manifest.json",
         headers: [
@@ -421,9 +366,6 @@ const nextConfig = {
         ],
       },
 
-      // ============================================
-      // 10. PAGES D'ERREUR
-      // ============================================
       {
         source: "/(404|500|error)",
         headers: [
@@ -438,9 +380,6 @@ const nextConfig = {
         ],
       },
 
-      // ============================================
-      // 11. PAGES SENSIBLES (auth, payment, checkout)
-      // ============================================
       {
         source:
           "/(login|register|forgot-password|reset-password|cart|shipping|payment|confirmation)",
@@ -458,7 +397,6 @@ const nextConfig = {
     ];
   },
 
-  // Configuration des redirections
   async redirects() {
     return [
       {
@@ -474,19 +412,14 @@ const nextConfig = {
     ];
   },
 
-  // Configuration du runtime serveur
   serverRuntimeConfig: {
     PROJECT_ROOT: __dirname,
   },
 
-  // Configuration Webpack simplifiée
   webpack: (config, { dev, isServer }) => {
-    // Configuration minimale pour la production
     if (!dev) {
-      // Optimisations de base
       config.optimization.moduleIds = "deterministic";
 
-      // Split chunks simple
       if (!isServer) {
         config.optimization.splitChunks = {
           chunks: "all",
@@ -506,13 +439,11 @@ const nextConfig = {
         };
       }
 
-      // Cache filesystem pour builds plus rapides
       config.cache = {
         type: "filesystem",
         cacheDirectory: path.resolve(__dirname, ".next/cache/webpack"),
       };
 
-      // Réduction des logs
       config.infrastructureLogging = {
         level: "error",
       };
@@ -521,12 +452,10 @@ const nextConfig = {
     return config;
   },
 
-  // ESLint - Ne pas ignorer les erreurs
   eslint: {
     ignoreDuringBuilds: true,
   },
 
-  // Logging en développement seulement
   logging: {
     fetches: {
       fullUrl: process.env.NODE_ENV === "development",
@@ -534,40 +463,29 @@ const nextConfig = {
   },
 };
 
-// Configuration Sentry - ERREURS SEULEMENT (pas de performance/replay)
 const sentryWebpackPluginOptions = {
   org: process.env.SENTRY_ORG || "benew",
   project: process.env.SENTRY_PROJECT || "buyitnow",
   authToken: process.env.SENTRY_AUTH_TOKEN,
 
-  // Configuration silencieuse en production
   silent: true,
 
-  // Désactivation des plugins si pas d'auth token
   disableServerWebpackPlugin: !process.env.SENTRY_AUTH_TOKEN,
   disableClientWebpackPlugin: !process.env.SENTRY_AUTH_TOKEN,
 
-  // Upload des sourcemaps
   widenClientFileUpload: true,
   transpileClientSDK: true,
   hideSourceMaps: true,
 
-  // Mode dry-run si pas en production ou pas de token
   dryRun:
     process.env.NODE_ENV !== "production" || !process.env.SENTRY_AUTH_TOKEN,
 
-  // Debug seulement en développement
   debug: false,
 
-  // Ignorer l'erreur de résolution API si configuré
-  // tunnelRoute: '/monitoring',
-
-  // Configuration des fichiers à inclure
   include: ".next",
   ignore: ["node_modules", ".next/cache"],
 };
 
-// Export avec Sentry et Bundle Analyzer
 export default withSentryConfig(
   bundleAnalyzer(nextConfig),
   sentryWebpackPluginOptions,
