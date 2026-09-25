@@ -17,7 +17,7 @@ const ServiceWorkerManager = dynamic(
 
 const SITE_URL =
   process.env.NEXT_PUBLIC_SITE_URL ||
-  "https://bs-plus-client-better.vercel.app";
+  "https://bs-2-plus-client-better.vercel.app";
 
 // Métadonnées globales pour le site avec configuration des icônes
 export const metadata = {

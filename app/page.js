@@ -16,7 +16,7 @@ const getHomePageData = async () => {
   try {
     // 1. Construire l'URL de l'API
     const apiUrl = `${
-      process.env.API_URL || "https://bs-plus-client-better.vercel.app"
+      process.env.API_URL || "https://bs-2-plus-client-better.vercel.app"
     }/api/homepage`;
 
     console.log("Fetching homepage data from:", apiUrl);

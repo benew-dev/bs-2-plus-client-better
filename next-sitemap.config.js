@@ -15,7 +15,7 @@ const { captureException } = require("./monitoring/sentry");
  */
 
 // Définir la constante en haut du fichier
-const DEFAULT_SITE_URL = "https://bs-plus-client-better.vercel.app";
+const DEFAULT_SITE_URL = "https://bs-2-plus-client-better.vercel.app";
 let SITE_URL = process.env.NEXT_PUBLIC_SITE_URL;
 
 try {
