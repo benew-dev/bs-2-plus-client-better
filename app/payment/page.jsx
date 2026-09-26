@@ -156,6 +156,8 @@ const PaymentPage = async () => {
     console.warn("Failed to fetch payment platforms:", platformsData.message);
   }
 
+  console.log("Rendering PaymentPage with platforms:", platformsData.platforms);
+
   return (
     <div
       className="payment-page"
