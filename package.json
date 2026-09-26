@@ -24,6 +24,7 @@
     "next-cloudinary": "^6.19.3",
     "next-sitemap": "^4.2.3",
     "react": "19.2.8",
+    "react-awesome-stars-rating": "^1.4.2",
     "react-dom": "19.2.8",
     "react-responsive-pagination": "^2.14.0",
     "react-swipeable": "^7.0.2",
