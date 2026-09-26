@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
+import { ObjectId } from "mongodb";
 import dbConnect from "@/backend/config/dbConnect";
 import Product from "@/backend/models/product";
-import Category from "@/backend/models/category";
 import { captureException } from "@/monitoring/sentry";
 import { withIntelligentRateLimit } from "@/utils/rateLimit";
 import { extractUserInfoFromRequest } from "@/lib/auth-utils";
@@ -12,12 +12,9 @@ import { extractUserInfoFromRequest } from "@/lib/auth-utils";
  * Rate limit: Configuration intelligente - publicRead (100 req/min) ou authenticatedRead (200 req/min)
  */
 export const GET = withIntelligentRateLimit(
-  async function (req, context) {
-    let id;
+  async function (req, { params }) {
     try {
-      // ✅ Next.js 15 : params est une Promise dans les route handlers
-      ({ id } = await context.params);
-
+      const { id } = await params;
       if (!id || !/^[0-9a-fA-F]{24}$/.test(id)) {
         return NextResponse.json(
           {
@@ -28,18 +25,18 @@ export const GET = withIntelligentRateLimit(
         );
       }
 
-      // Connexion DB
-      await dbConnect();
+      const mongooseInstance = await dbConnect();
 
-      // Récupérer le produit principal
+      // ✅ Plus de .populate("reviews.user", ...) : les auteurs d'avis sont
+      // des comptes Better Auth, récupérés séparément depuis la collection native "user"
       const product = await Product.findById(id)
         .select(
-          "name description price images category stock sold isActive slug",
+          "name description price images type category stock sold isActive reviews ratings slug",
         )
+        .populate("type", "nom")
         .populate("category", "categoryName")
         .lean();
 
-      // Si le produit n'existe pas
       if (!product) {
         return NextResponse.json(
           {
@@ -50,7 +47,69 @@ export const GET = withIntelligentRateLimit(
         );
       }
 
-      // Récupérer les produits similaires (même catégorie)
+      if (product.reviews && product.reviews.length > 0) {
+        const authorIds = [
+          ...new Set(
+            product.reviews
+              .map((review) => review.user)
+              .filter(Boolean)
+              .map((userId) => userId.toString()),
+          ),
+        ];
+
+        const objectIds = authorIds
+          .map((userId) => {
+            try {
+              return new ObjectId(userId);
+            } catch {
+              return null;
+            }
+          })
+          .filter(Boolean);
+
+        let authorsMap = new Map();
+        if (objectIds.length > 0) {
+          try {
+            const db = mongooseInstance.connection.getClient().db();
+            const authorDocs = await db
+              .collection("user")
+              .find(
+                { _id: { $in: objectIds } },
+                { projection: { name: 1, image: 1 } },
+              )
+              .toArray();
+
+            authorDocs.forEach((doc) => {
+              authorsMap.set(doc._id.toString(), {
+                name: doc.name,
+                image: doc.image || null,
+              });
+            });
+          } catch (authorError) {
+            console.warn(
+              "Failed to fetch review authors:",
+              authorError.message,
+            );
+          }
+        }
+
+        // ✅ Conserver _id (attendu par getUserReview et par convention Mongoose)
+        // en plus de name/image résolus depuis la collection Better Auth "user"
+        product.reviews = product.reviews.map((review) => ({
+          ...review,
+          user: review.user
+            ? {
+                _id: review.user.toString(),
+                ...(authorsMap.get(review.user.toString()) || {
+                  name: null,
+                  image: null,
+                }),
+              }
+            : null,
+        }));
+      }
+
+      // Récupérer les produits similaires avec ratings
       let sameCategoryProducts = [];
       if (product.category) {
         try {
@@ -59,7 +118,7 @@ export const GET = withIntelligentRateLimit(
             _id: { $ne: id },
             isActive: true,
           })
-            .select("name price images slug")
+            .select("name price images ratings slug")
             .limit(4)
             .lean();
         } catch (error) {
@@ -95,7 +154,6 @@ export const GET = withIntelligentRateLimit(
           tags: {
             component: "api",
             route: "products/[id]/GET",
-            productId: id,
           },
         });
       }

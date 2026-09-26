@@ -20,9 +20,12 @@ import { isArrayEmpty } from "@/helpers/helpers";
 import { INCREASE } from "@/helpers/constants";
 
 import DOMPurify from "dompurify";
-import { Share2, ShoppingCart, Star, Truck, Heart } from "lucide-react";
+import ReactStarsRating from "react-awesome-stars-rating";
+import { Share2, ShoppingCart, Star, Truck, Heart } from "lucide-react"; // ✅ Import Heart
 import { useSwipeable } from "react-swipeable";
-// ✅ Plus besoin de useSession ici : AuthContext expose déjà un user à jour (session + optimistic)
+import OrderContext from "@/context/OrderContext";
+import NewReview from "./NewReview";
+import Reviews from "./Reviews";
 
 // Chargement dynamique des composants
 const BreadCrumbs = dynamic(() => import("@/components/layouts/BreadCrumbs"), {
@@ -126,15 +129,16 @@ const ProductImageGallery = memo(function ProductImageGallery({
   );
 });
 
+// ✅ MODIFICATION: Ajouter les props favoris
 const ProductInfo = memo(function ProductInfo({
   product,
   inStock,
   onAddToCart,
   isAddingToCart,
   onShare,
-  isFavorite,
-  onToggleFavorite,
-  favoriteLoading,
+  onToggleFavorite, // ✅ NOUVEAU
+  isFavorite, // ✅ NOUVEAU
+  favoriteLoading, // ✅ NOUVEAU
 }) {
   const formattedPrice = useMemo(
     () => formatPrice(product?.price),
@@ -143,37 +147,32 @@ const ProductInfo = memo(function ProductInfo({
 
   return (
     <main>
+      {/* ✅ MODIFICATION: Ajouter le bouton favoris en haut à droite */}
       <div className="flex items-start justify-between mb-4">
         <h1 className="font-semibold text-xl sm:text-2xl text-gray-800 flex-1">
           {product?.name || "Product Not Available"}
         </h1>
 
+        {/* Bouton Favoris */}
         <button
           onClick={onToggleFavorite}
           disabled={favoriteLoading}
-          className={`ml-4 flex-shrink-0 backdrop-blur-sm p-2.5 rounded-full shadow-md transition-all duration-200 ${
+          className={`ml-4 p-3 rounded-full transition-all duration-300 shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0 ${
             isFavorite
-              ? "bg-pink-50 hover:bg-pink-100"
-              : "bg-white hover:bg-gray-50"
-          } ${
-            favoriteLoading
-              ? "opacity-60 cursor-not-allowed scale-95"
-              : "hover:scale-110"
+              ? "bg-pink-500 text-white hover:bg-pink-600"
+              : "bg-white text-gray-600 hover:bg-pink-50 hover:text-pink-500 border border-gray-300"
           }`}
           aria-label={
             isFavorite ? "Retirer des favoris" : "Ajouter aux favoris"
           }
-          aria-busy={favoriteLoading}
           title={isFavorite ? "Retirer des favoris" : "Ajouter aux favoris"}
         >
           {favoriteLoading ? (
-            <div className="w-5 h-5 border-2 border-pink-600 border-t-transparent rounded-full animate-spin" />
+            <div className="w-6 h-6 border-2 border-pink-600 border-t-transparent rounded-full animate-spin" />
           ) : (
             <Heart
-              className={`w-5 h-5 transition-all duration-200 ${
-                isFavorite
-                  ? "fill-pink-500 stroke-pink-500 scale-110"
-                  : "stroke-gray-700 hover:stroke-pink-500 hover:scale-105"
+              className={`w-6 h-6 transition-all ${
+                isFavorite ? "fill-current" : ""
               }`}
             />
           )}
@@ -265,7 +264,7 @@ const ProductInfo = memo(function ProductInfo({
               Ajout en cours...
             </span>
           ) : (
-            <div className="flex flex-row">
+            <div className="flex flex-row items-center justify-center gap-2">
               <ShoppingCart />
               {inStock ? "Ajouter au panier" : "Indisponible"}
             </div>
@@ -273,7 +272,7 @@ const ProductInfo = memo(function ProductInfo({
         </button>
 
         <button
-          className="w-full sm:w-auto px-4 py-2 flex flex-row text-blue-600 border border-blue-600 rounded-lg hover:bg-blue-50 focus:ring-2 focus:ring-blue-300 focus:outline-none transition-colors"
+          className="w-full sm:w-auto px-4 py-2 flex flex-row items-center justify-center text-blue-600 border border-blue-600 rounded-lg hover:bg-blue-50 focus:ring-2 focus:ring-blue-300 focus:outline-none transition-colors"
           aria-label="Partager ce produit"
           onClick={onShare}
         >
@@ -282,7 +281,28 @@ const ProductInfo = memo(function ProductInfo({
         </button>
       </div>
 
-      <ul className="mb-5 text-gray-600">
+      <ul className="mb-5 text-gray-600 space-y-3">
+        {product?.ratings > 0 && (
+          <li className="flex items-center">
+            <span className="font-medium w-36 inline-block">Note moyenne:</span>
+            <div className="flex items-center gap-2">
+              <ReactStarsRating
+                value={product.ratings}
+                isEdit={false}
+                primaryColor="#f97316"
+                secondaryColor="#d1d5db"
+                className="flex"
+                starGap={4}
+                count={5}
+                size={20}
+              />
+              <span className="font-semibold text-orange-600">
+                {product.ratings.toFixed(1)} / 5
+              </span>
+            </div>
+          </li>
+        )}
+
         <li className="mb-2 flex">
           <span className="font-medium w-36 inline-block">Disponibilité:</span>
           {inStock ? (
@@ -350,6 +370,7 @@ const ProductInfo = memo(function ProductInfo({
   );
 });
 
+// ✅ MODIFICATION: Afficher le rating pour les produits similaires
 const RelatedProductsCarousel = memo(function RelatedProductsCarousel({
   products,
   currentProductId,
@@ -440,7 +461,7 @@ const RelatedProductsCarousel = memo(function RelatedProductsCarousel({
         setIsAutoScrolling(false);
       }
     },
-    onSwiping: () => {
+    onSwiping: (eventData) => {
       setIsAutoScrolling(false);
     },
     preventScrollOnSwipe: true,
@@ -484,7 +505,7 @@ const RelatedProductsCarousel = memo(function RelatedProductsCarousel({
                 }}
               >
                 <Link
-                  href={`/product/${product?._id}`}
+                  href={`/shop/${product?._id}`}
                   className="group/card block bg-white p-4 rounded-lg shadow-sm hover:shadow-md transition-all duration-300 border border-gray-200 hover:border-blue-100 transform hover:-translate-y-1 h-full"
                 >
                   <div className="aspect-square mb-4 bg-gray-100 rounded-lg overflow-hidden relative">
@@ -522,6 +543,25 @@ const RelatedProductsCarousel = memo(function RelatedProductsCarousel({
                     <h3 className="font-medium text-gray-800 group-hover/card:text-blue-600 transition-colors line-clamp-2 text-sm leading-tight min-h-[2.5rem]">
                       {product?.name || "Produit sans nom"}
                     </h3>
+
+                    {/* ✅ AJOUT: Afficher le rating */}
+                    {product?.ratings > 0 && (
+                      <div className="flex items-center gap-2">
+                        <ReactStarsRating
+                          value={product.ratings}
+                          isEdit={false}
+                          primaryColor="#f97316"
+                          secondaryColor="#d1d5db"
+                          className="flex"
+                          starGap={2}
+                          count={5}
+                          size={14}
+                        />
+                        <span className="text-xs font-medium text-orange-600">
+                          {product.ratings.toFixed(1)}
+                        </span>
+                      </div>
+                    )}
 
                     <div className="flex items-center justify-between">
                       <p className="font-bold text-blue-600 text-lg">
@@ -578,18 +618,33 @@ const RelatedProductsCarousel = memo(function RelatedProductsCarousel({
   );
 });
 
-// ✅ Composant principal avec fonctionnalités favoris
+// Composant principal
 function ProductDetails({ product, sameCategoryProducts }) {
-  // ✅ user vient directement d'AuthContext (session + optimistic update fusionnés)
   const { user, toggleFavorite } = useContext(AuthContext);
   const { addItemToCart, updateCart, cart, error, clearError } =
     useContext(CartContext);
+  const { canUserReview, canReview } = useContext(OrderContext);
 
   const [selectedImage, setSelectedImage] = useState(null);
   const [isAddingToCart, setIsAddingToCart] = useState(false);
 
-  // ✅ État pour le bouton favoris
+  // ✅ AJOUT: États pour les favoris
   const [favoriteLoading, setFavoriteLoading] = useState(false);
+
+  // ✅ AJOUT: Calculer l'état favori
+  const isFavorite = useMemo(() => {
+    if (!user?.favorites || !Array.isArray(user.favorites)) {
+      return false;
+    }
+
+    return user.favorites.some(
+      (fav) => fav.productId?.toString() === product?._id?.toString(),
+    );
+  }, [user, product?._id]);
+
+  useEffect(() => {
+    canUserReview(product?._id);
+  }, []);
 
   useEffect(() => {
     if (product?.images && product.images.length > 0) {
@@ -616,78 +671,27 @@ function ProductDetails({ product, sameCategoryProducts }) {
 
     return [
       { name: "Accueil", url: "/" },
-      { name: "Produits", url: "/products" },
       {
-        name: product.category?.categoryName || "Catégorie",
-        url: `/category/${product.category?._id || "all"}`,
+        name: `${product?.type?.nom === "Homme" ? "Men" : "Women" || "men"}`,
+        url: `${process.env.NEXT_PUBLIC_SITE_URL}/${product?.type?.nom === "Homme" ? "/men" : "/women" || "/men"}`,
       },
       {
-        name: product.name
-          ? product.name.length > 40
-            ? `${product.name.substring(0, 40)}...`
-            : product.name
+        name: product?.category?.categoryName || "Catégorie",
+        url: `${process.env.NEXT_PUBLIC_SITE_URL}/${product?.type?.nom === "Homme" ? "/men" : "/women" || "/men"}?category=${product?.category?._id || ""}`,
+      },
+      {
+        name: product?.name
+          ? product?.name?.length > 40
+            ? `${product?.name?.substring(0, 40)}...`
+            : product?.name
           : "Produit",
-        url: `/product/${product._id}`,
+        url: `/shop/${product?._id}`,
       },
     ];
   }, [product]);
 
-  // ✅ Calculer si le produit est dans les favoris (user = AuthContext.user, déjà fusionné)
-  const isFavorite = useMemo(() => {
-    if (!user || !user.favorites || !Array.isArray(user.favorites)) {
-      return false;
-    }
-
-    return user.favorites.some(
-      (fav) => fav.productId?.toString() === product?._id,
-    );
-  }, [user, product?._id]);
-
-  // ✅ Handler pour toggle favoris
-  const handleToggleFavorite = useCallback(
-    async (e) => {
-      e?.preventDefault();
-      e?.stopPropagation();
-
-      if (favoriteLoading) {
-        return;
-      }
-
-      if (!user) {
-        return toast.error(
-          "Connectez-vous pour ajouter des produits à vos favoris !",
-        );
-      }
-
-      if (!product || !product._id) {
-        return toast.error("Produit invalide");
-      }
-
-      setFavoriteLoading(true);
-      try {
-        const productImage = product.images?.[0] || {
-          public_id: null,
-          url: null,
-        };
-
-        await toggleFavorite(
-          product._id,
-          product.name,
-          productImage,
-          isFavorite ? "remove" : "add",
-        );
-      } catch (error) {
-        console.error("Error toggling favorite:", error);
-        toast.error("Erreur lors de la mise à jour des favoris");
-      } finally {
-        setFavoriteLoading(false);
-      }
-    },
-    [user, product, toggleFavorite, favoriteLoading, isFavorite],
-  );
-
   const handleAddToCart = useCallback(() => {
-    if (!product || !product._id) {
+    if (!product || !product?._id) {
       toast.error("Produit invalide");
       return;
     }
@@ -709,14 +713,14 @@ function ProductDetails({ product, sameCategoryProducts }) {
     setIsAddingToCart(true);
 
     try {
-      const isProductInCart = cart.find((i) => i?.productId === product._id);
+      const isProductInCart = cart.find((i) => i?.productId === product?._id);
 
       if (isProductInCart) {
         updateCart(isProductInCart, INCREASE);
         toast.success("Quantité mise à jour dans votre panier");
       } else {
         addItemToCart({
-          product: product._id,
+          product: product?._id,
         });
         toast.success("Produit ajouté à votre panier");
       }
@@ -761,6 +765,35 @@ function ProductDetails({ product, sameCategoryProducts }) {
   const handleImageSelect = useCallback((imageUrl) => {
     setSelectedImage(imageUrl);
   }, []);
+
+  // ✅ AJOUT: Gérer le toggle des favoris
+  const handleToggleFavorite = useCallback(async () => {
+    if (!user) {
+      toast.info("Connectez-vous pour ajouter aux favoris");
+      return;
+    }
+
+    if (favoriteLoading) return;
+
+    try {
+      setFavoriteLoading(true);
+
+      const result = await toggleFavorite(
+        product._id,
+        product.name,
+        product.images?.[0] || { public_id: null, url: null },
+        "toggle",
+      );
+
+      if (!result.success) {
+        console.error("❌ Échec de la mise à jour des favoris");
+      }
+    } catch (error) {
+      console.error("❌ Error toggling favorite:", error);
+    } finally {
+      setFavoriteLoading(false);
+    }
+  }, [user, favoriteLoading, toggleFavorite, product]);
 
   if (!product) {
     return (
@@ -811,14 +844,15 @@ function ProductDetails({ product, sameCategoryProducts }) {
               onImageSelect={handleImageSelect}
             />
 
+            {/* ✅ MODIFICATION: Passer les props favoris */}
             <ProductInfo
               product={product}
               inStock={inStock}
               onAddToCart={handleAddToCart}
               isAddingToCart={isAddingToCart}
               onShare={handleShare}
-              isFavorite={isFavorite}
               onToggleFavorite={handleToggleFavorite}
+              isFavorite={isFavorite}
               favoriteLoading={favoriteLoading}
             />
           </div>
@@ -837,7 +871,14 @@ function ProductDetails({ product, sameCategoryProducts }) {
             </div>
           )}
         </div>
-
+        {canReview && <NewReview product={product} />}
+        <hr />
+        <div className="font-semibold">
+          <h1 className="text-gray-500 review-title mb-6 mt-10 text-2xl">
+            Other Customers Reviews
+          </h1>
+          <Reviews reviews={product?.reviews} />
+        </div>
         <RelatedProductsCarousel
           products={sameCategoryProducts}
           currentProductId={product._id}

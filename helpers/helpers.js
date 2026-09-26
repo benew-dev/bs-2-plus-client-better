@@ -82,7 +82,7 @@ export const objectToQueryString = (params) => {
 
   return Object.entries(params)
     .filter(
-      ([_, value]) => value !== undefined && value !== null && value !== ""
+      ([_, value]) => value !== undefined && value !== null && value !== "",
     )
     .map(([key, value]) => {
       if (Array.isArray(value)) {
@@ -139,4 +139,16 @@ export const getCookieName = () => {
 export const parseCallbackUrl = (url) => {
   const res = url.replace(/%3A/g, ":").replace(/%2F/g, "/");
   return res;
+};
+
+export const getUserReview = (reviews, userId) => {
+  let userReview = null;
+
+  reviews?.forEach((review) => {
+    if (review?.user?._id === userId) {
+      userReview = review;
+    }
+  });
+
+  return userReview;
 };
