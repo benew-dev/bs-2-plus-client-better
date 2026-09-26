@@ -3,6 +3,7 @@ import { ObjectId } from "mongodb";
 import dbConnect from "@/backend/config/dbConnect";
 import Product from "@/backend/models/product";
 import Type from "@/backend/models/type";
+import Category from "@/backend/models/category";
 import { captureException } from "@/monitoring/sentry";
 import { withIntelligentRateLimit } from "@/utils/rateLimit";
 import { extractUserInfoFromRequest } from "@/lib/auth-utils";

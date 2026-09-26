@@ -91,6 +91,11 @@ const getPaymentPlatforms = async () => {
 
     const platforms = responseBody.data.platforms || [];
 
+    console.log(
+      `Fetched ${platforms.length} payment platforms successfully.`,
+      platforms,
+    );
+
     return {
       success: true,
       message: "Plateformes de paiement récupérées avec succès",

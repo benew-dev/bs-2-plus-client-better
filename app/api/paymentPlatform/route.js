@@ -48,11 +48,6 @@ export const GET = withIntelligentRateLimit(
         .toString("base64")
         .substring(0, 20);
 
-      console.log(
-        "Payment platforms fetched successfully:",
-        formattedPaymentPlatforms,
-      );
-
       return NextResponse.json(
         {
           success: true,
