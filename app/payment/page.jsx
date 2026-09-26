@@ -49,10 +49,7 @@ const getPaymentPlatforms = async () => {
 
     const res = await fetch(apiUrl, {
       signal: controller.signal,
-      next: {
-        revalidate: 1800, // Cache Next.js de 30 minutes (plateformes stables)
-        tags: ["payment-platforms"],
-      },
+      cache: "no-store",
     });
 
     clearTimeout(timeoutId);
