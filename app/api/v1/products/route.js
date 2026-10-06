@@ -1,4 +1,4 @@
-// app/api/products/route.js
+// app/api/v1/products/route.js
 
 import { NextResponse } from "next/server";
 import dbConnect from "@/backend/config/dbConnect";
@@ -15,6 +15,12 @@ import { extractUserInfoFromRequest } from "@/lib/auth-utils";
 const DEFAULT_PER_PAGE = process.env.DEFAULT_PRODUCTS_PER_PAGE;
 const MAX_PER_PAGE = process.env.MAX_PRODUCTS_PER_PAGE;
 
+/**
+ * GET /api/v1/products
+ * Version mobile : récupère les produits d'un type (men/women) avec
+ * filtres, pagination, et les catégories actives de ce type.
+ * Route publique. Rate limit: publicRead (100 req/min) ou authenticatedRead (200 req/min)
+ */
 export const GET = withIntelligentRateLimit(
   async function (req) {
     try {
@@ -82,16 +88,13 @@ export const GET = withIntelligentRateLimit(
         .sort({ categoryName: 1 })
         .lean();
 
-      // Formater les catégories
       const formattedCategories = categories.map((cat) => ({
         _id: cat._id,
         name: cat.categoryName,
       }));
 
-      // Configuration de la pagination
       const resPerPage = Math.min(MAX_PER_PAGE, Math.max(1, DEFAULT_PER_PAGE));
 
-      // Créer les filtres avec le typeId
       const apiFilters = new APIFilters(
         Product.find({ type: typeDoc._id, isActive: true })
           .select("name description stock price images category ratings")
@@ -108,14 +111,12 @@ export const GET = withIntelligentRateLimit(
 
       apiFilters.pagination(resPerPage);
 
-      // Récupérer les produits avec populate
       const products = await apiFilters.query
         .populate("category", "categoryName")
         .lean();
 
       const totalPages = Math.ceil(filteredProductsCount / resPerPage);
 
-      // Réponse avec catégories incluses
       const responseData = {
         success: true,
         data: {
@@ -144,7 +145,7 @@ export const GET = withIntelligentRateLimit(
 
       if (error.name !== "ValidationError") {
         captureException(error, {
-          tags: { component: "api", route: "products/GET" },
+          tags: { component: "api", route: "v1/products/GET" },
           extra: {
             query: req.nextUrl.search,
           },

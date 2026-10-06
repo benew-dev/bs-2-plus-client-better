@@ -1,4 +1,4 @@
-// app/api/paymentPlatform/route.js
+// app/api/v1/paymentPlatform/route.js
 
 import { NextResponse } from "next/server";
 import dbConnect from "@/backend/config/dbConnect";
@@ -8,9 +8,9 @@ import { withIntelligentRateLimit } from "@/utils/rateLimit";
 import { extractUserInfoFromRequest } from "@/lib/auth-utils";
 
 /**
- * GET /api/paymentPlatform
- * Récupère toutes les plateformes de paiement disponibles
- * Rate limit: Configuration intelligente - publicRead (100 req/min) ou authenticatedRead (200 req/min)
+ * GET /api/v1/paymentPlatform
+ * Version mobile : récupère toutes les plateformes de paiement disponibles.
+ * Route publique. Rate limit: publicRead (100 req/min) ou authenticatedRead (200 req/min)
  */
 export const GET = withIntelligentRateLimit(
   async function (req) {
@@ -72,7 +72,7 @@ export const GET = withIntelligentRateLimit(
       captureException(error, {
         tags: {
           component: "api",
-          route: "payment-platforms/GET",
+          route: "v1/payment-platforms/GET",
           error_type: error.name,
         },
         extra: {

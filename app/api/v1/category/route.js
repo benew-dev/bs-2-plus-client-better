@@ -1,4 +1,4 @@
-// app/api/category/route.js
+// app/api/v1/category/route.js
 
 import { NextResponse } from "next/server";
 import dbConnect from "@/backend/config/dbConnect";
@@ -8,39 +8,22 @@ import { withIntelligentRateLimit } from "@/utils/rateLimit";
 import { extractUserInfoFromRequest } from "@/lib/auth-utils";
 
 /**
- * GET /api/category
- * Récupère toutes les catégories actives
- * Rate limit: Configuration intelligente - publicRead (100 req/min) ou authenticatedRead (200 req/min)
- *
- * Headers de sécurité gérés par next.config.mjs pour /api/category/* :
- * - Cache-Control: public, max-age=300, stale-while-revalidate=600
- * - CDN-Cache-Control: max-age=600
- * - X-Content-Type-Options: nosniff
- * - Vary: Accept-Encoding
- *
- * Headers globaux de sécurité (toutes routes) :
- * - Strict-Transport-Security: max-age=63072000; includeSubDomains; preload
- * - X-Frame-Options: SAMEORIGIN
- * - Referrer-Policy: strict-origin-when-cross-origin
- * - Permissions-Policy: [configuration restrictive]
- * - Content-Security-Policy: [configuration complète]
- *
- * Note: Les catégories sont des données publiques avec cache long
- * car elles changent rarement dans un e-commerce
+ * GET /api/v1/category
+ * Version mobile : récupère toutes les catégories actives (tous types
+ * confondus — distinct des catégories scopées par type renvoyées avec
+ * /api/v1/products).
+ * Route publique. Rate limit: publicRead (100 req/min) ou authenticatedRead (200 req/min)
  */
 export const GET = withIntelligentRateLimit(
   async function (req) {
     try {
-      // Connexion DB
       await dbConnect();
 
-      // Récupérer les catégories actives avec plus de détails
       const categories = await Category.find({ isActive: true })
         .select("categoryName")
         .sort({ categoryName: 1 })
         .lean();
 
-      // Vérifier s'il y a des catégories
       if (!categories || categories.length === 0) {
         return NextResponse.json(
           {
@@ -59,13 +42,11 @@ export const GET = withIntelligentRateLimit(
         );
       }
 
-      // Formater les catégories pour optimiser la réponse
       const formattedCategories = categories.map((cat) => ({
         _id: cat._id,
         name: cat.categoryName,
       }));
 
-      // Calculer un hash simple pour l'ETag (optionnel)
       const dataHash = Buffer.from(JSON.stringify(formattedCategories))
         .toString("base64")
         .substring(0, 20);
@@ -80,7 +61,7 @@ export const GET = withIntelligentRateLimit(
               timestamp: new Date().toISOString(),
               etag: dataHash,
               cached: true,
-              cacheMaxAge: 300, // Informer le client du cache
+              cacheMaxAge: 300,
             },
           },
         },
@@ -89,11 +70,10 @@ export const GET = withIntelligentRateLimit(
     } catch (error) {
       console.error("Categories fetch error:", error.message);
 
-      // Capturer seulement les vraies erreurs système
       captureException(error, {
         tags: {
           component: "api",
-          route: "category/GET",
+          route: "v1/category/GET",
           error_type: error.name,
         },
         extra: {
@@ -102,7 +82,6 @@ export const GET = withIntelligentRateLimit(
         },
       });
 
-      // Gestion améliorée des erreurs
       let status = 500;
       let message = "Failed to fetch categories";
       let code = "INTERNAL_ERROR";
@@ -136,6 +115,6 @@ export const GET = withIntelligentRateLimit(
   {
     category: "api",
     action: "publicRead",
-    extractUserInfo: extractUserInfoFromRequest, // ✅ Utiliser Better Auth au lieu de next-auth
+    extractUserInfo: extractUserInfoFromRequest,
   },
 );

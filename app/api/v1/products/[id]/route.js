@@ -1,4 +1,4 @@
-// app/api/products/[id]/route.js
+// app/api/v1/products/[id]/route.js
 
 import { NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
@@ -11,9 +11,10 @@ import { withIntelligentRateLimit } from "@/utils/rateLimit";
 import { extractUserInfoFromRequest } from "@/lib/auth-utils";
 
 /**
- * GET /api/products/[id]
- * Récupère un produit par son ID avec produits similaires
- * Rate limit: Configuration intelligente - publicRead (100 req/min) ou authenticatedRead (200 req/min)
+ * GET /api/v1/products/[id]
+ * Version mobile : récupère un produit par son ID avec avis (auteurs
+ * résolus depuis la collection Better Auth "user") et produits similaires.
+ * Route publique. Rate limit: publicRead (100 req/min) ou authenticatedRead (200 req/min)
  */
 export const GET = withIntelligentRateLimit(
   async function (req, { params }) {
@@ -31,8 +32,9 @@ export const GET = withIntelligentRateLimit(
 
       const mongooseInstance = await dbConnect();
 
-      // ✅ Plus de .populate("reviews.user", ...) : les auteurs d'avis sont
-      // des comptes Better Auth, récupérés séparément depuis la collection native "user"
+      // Les auteurs d'avis sont des comptes Better Auth, récupérés
+      // séparément depuis la collection native "user" (pas de populate
+      // Mongoose classique possible ici)
       const product = await Product.findById(id)
         .select(
           "name description price images type category stock sold isActive reviews ratings slug",
@@ -97,8 +99,8 @@ export const GET = withIntelligentRateLimit(
           }
         }
 
-        // ✅ Conserver _id (attendu par getUserReview et par convention Mongoose)
-        // en plus de name/image résolus depuis la collection Better Auth "user"
+        // _id conservé (attendu par getUserReview et par convention
+        // Mongoose) en plus de name/image résolus depuis "user"
         product.reviews = product.reviews.map((review) => ({
           ...review,
           user: review.user
@@ -113,7 +115,6 @@ export const GET = withIntelligentRateLimit(
         }));
       }
 
-      // Récupérer les produits similaires avec ratings
       let sameCategoryProducts = [];
       if (product.category) {
         try {
@@ -157,7 +158,7 @@ export const GET = withIntelligentRateLimit(
         captureException(error, {
           tags: {
             component: "api",
-            route: "products/[id]/GET",
+            route: "v1/products/[id]/GET",
           },
         });
       }

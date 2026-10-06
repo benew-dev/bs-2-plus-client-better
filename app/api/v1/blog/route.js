@@ -1,10 +1,14 @@
-// app/api/blog/route.js
+// app/api/v1/blog/route.js
 
 import { NextResponse } from "next/server";
 import connectDB from "@/backend/config/dbConnect";
 import Article from "@/backend/models/article";
 
-// GET - Récupérer les articles publiés (public)
+/**
+ * GET /api/v1/blog
+ * Version mobile : récupère les articles publiés (public), avec pagination
+ * et filtre optionnel par tag.
+ */
 export async function GET(req) {
   try {
     await connectDB();
@@ -15,21 +19,19 @@ export async function GET(req) {
     const tag = searchParams.get("tag");
     const skip = (page - 1) * limit;
 
-    // Construire la requête
     const query = { isPublished: true };
     if (tag) {
       query.tags = tag.toLowerCase();
     }
 
-    // Récupérer les articles (sans populate author)
+    // Exclure author et content (pas besoin dans la liste)
     const articles = await Article.find(query)
-      .select("-author -content") // Exclure author et content (pas besoin dans la liste)
+      .select("-author -content")
       .sort({ publishedAt: -1 })
       .skip(skip)
       .limit(limit)
       .lean();
 
-    // Compter le total
     const totalArticles = await Article.countDocuments(query);
     const totalPages = Math.ceil(totalArticles / limit);
 

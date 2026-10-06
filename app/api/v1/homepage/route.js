@@ -1,4 +1,4 @@
-// app/api/homepage/route.js
+// app/api/v1/homepage/route.js
 
 import { NextResponse } from "next/server";
 import dbConnect from "@/backend/config/dbConnect";
@@ -8,15 +8,9 @@ import { withIntelligentRateLimit } from "@/utils/rateLimit";
 import { extractUserInfoFromRequest } from "@/lib/auth-utils";
 
 /**
- * GET /api/homepage
- * Récupère les données de la page d'accueil
- * Rate limit: Configuration intelligente - publicRead (100 req/min) ou authenticatedRead (200 req/min)
- *
- * Headers de sécurité gérés par next.config.mjs pour /api/homepage :
- * - Cache-Control: public, max-age=3600, stale-while-revalidate=7200
- * - CDN-Cache-Control: max-age=7200
- * - X-Content-Type-Options: nosniff
- * - Vary: Accept-Encoding
+ * GET /api/v1/homepage
+ * Version mobile : récupère les données de la page d'accueil.
+ * Route publique. Rate limit: publicRead (100 req/min) ou authenticatedRead (200 req/min)
  *
  * Note: Les données de la homepage sont publiques avec cache long
  * car elles changent rarement
@@ -24,16 +18,13 @@ import { extractUserInfoFromRequest } from "@/lib/auth-utils";
 export const GET = withIntelligentRateLimit(
   async function (req) {
     try {
-      // Connexion DB
       await dbConnect();
 
-      // Récupérer la page d'accueil (prendre la plus récente)
       const homePage = await HomePage.findOne()
         .select("title subtitle text image")
         .sort({ createdAt: -1 })
         .lean();
 
-      // Si aucune page d'accueil n'existe
       if (!homePage) {
         return NextResponse.json(
           {
@@ -49,7 +40,6 @@ export const GET = withIntelligentRateLimit(
         );
       }
 
-      // Formater la réponse
       const formattedHomePage = {
         title: homePage.title,
         subtitle: homePage.subtitle,
@@ -60,12 +50,10 @@ export const GET = withIntelligentRateLimit(
         },
       };
 
-      // Calculer un hash simple pour l'ETag (optionnel)
       const dataHash = Buffer.from(JSON.stringify(formattedHomePage))
         .toString("base64")
         .substring(0, 20);
 
-      // Headers de cache pour la homepage (change rarement)
       const cacheHeaders = {
         "Cache-Control": "public, max-age=3600, stale-while-revalidate=7200",
         "CDN-Cache-Control": "max-age=7200",
@@ -95,7 +83,7 @@ export const GET = withIntelligentRateLimit(
       captureException(error, {
         tags: {
           component: "api",
-          route: "homepage/GET",
+          route: "v1/homepage/GET",
           error_type: error.name,
         },
         extra: {

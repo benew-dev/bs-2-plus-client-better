@@ -1,4 +1,4 @@
-// app/api/review/[id]/route.js
+// app/api/v1/review/[id]/route.js
 
 import { NextResponse } from "next/server";
 import dbConnect from "@/backend/config/dbConnect";
@@ -12,14 +12,13 @@ import {
 import sanitizeHtml from "sanitize-html";
 
 /**
- * PUT /api/review/[id]
- * Ajoute ou met à jour un avis sur un produit
- * Rate limit: Configuration intelligente - write (30 req/min)
+ * PUT /api/v1/review/[id]
+ * Version mobile : ajoute ou met à jour un avis sur un produit.
+ * Rate limit: write (30 req/min)
  */
 export const PUT = withIntelligentRateLimit(
   async function (req, { params }) {
     try {
-      // Validation de l'ID du produit
       const { id } = await params;
       if (!id || !/^[0-9a-fA-F]{24}$/.test(id)) {
         return NextResponse.json(
@@ -32,13 +31,12 @@ export const PUT = withIntelligentRateLimit(
         );
       }
 
-      // Vérifier l'authentification (Better Auth)
+      // Vérifier l'authentification (Better Auth) — lève une erreur si
+      // non connecté, gérée dans le catch global (401)
       const authUser = await isAuthenticatedUser();
 
-      // Connexion DB
       await dbConnect();
 
-      // Parser les données
       let body;
       try {
         body = await req.json();
@@ -182,8 +180,7 @@ export const PUT = withIntelligentRateLimit(
         );
       }
 
-      // ✅ Récupérer le produit (plus besoin de chercher l'utilisateur via Mongoose,
-      // authUser contient déjà id/name/email depuis la session Better Auth)
+      // authUser contient déjà id/name/email depuis la session Better Auth
       const product = await Product.findById(id).select(
         "name reviews ratings isActive",
       );
@@ -210,7 +207,6 @@ export const PUT = withIntelligentRateLimit(
         );
       }
 
-      // Vérifier si l'utilisateur a déjà laissé un avis
       const existingReviewIndex = product.reviews.findIndex(
         (review) => review.user.toString() === authUser.id.toString(),
       );
@@ -238,7 +234,6 @@ export const PUT = withIntelligentRateLimit(
         });
       }
 
-      // Recalculer la note moyenne avec une décimale
       const totalReviews = product.reviews.length;
       const sumRatings = product.reviews.reduce(
         (sum, review) => sum + review.rating,
@@ -248,7 +243,6 @@ export const PUT = withIntelligentRateLimit(
 
       await product.save();
 
-      // Log de sécurité pour audit
       console.log("🔒 Security event - Product review added/updated:", {
         userId: authUser.id,
         userName: authUser.name,
@@ -314,7 +308,7 @@ export const PUT = withIntelligentRateLimit(
         captureException(error, {
           tags: {
             component: "api",
-            route: "review/[id]/PUT",
+            route: "v1/review/[id]/PUT",
           },
           extra: {
             errorName: error.name,

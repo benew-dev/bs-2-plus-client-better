@@ -1,11 +1,16 @@
-// app/api/blog/[slug]/route.js
+// app/api/v1/blog/[slug]/route.js
 
 import { NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
 import connectDB from "@/backend/config/dbConnect";
 import Article from "@/backend/models/article";
 
-// GET - Récupérer un article par slug (public)
+/**
+ * GET /api/v1/blog/[slug]
+ * Version mobile : récupère un article publié par son slug, avec l'auteur
+ * résolu depuis la collection Better Auth "user" (c'est un admin connecté,
+ * pas le modèle Mongoose "User").
+ */
 export async function GET(req, { params }) {
   try {
     const { slug } = await params;
@@ -23,8 +28,6 @@ export async function GET(req, { params }) {
       );
     }
 
-    // ✅ L'auteur est un admin connecté via Better Auth : lecture native
-    // de la collection "user" (pas le modèle Mongoose "User" / collection "users")
     let author = null;
     if (article.author) {
       try {
