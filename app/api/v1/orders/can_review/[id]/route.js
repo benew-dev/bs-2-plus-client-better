@@ -1,4 +1,4 @@
-// app/api/orders/can_review/[id]/route.js
+// app/api/v1/orders/can_review/[id]/route.js
 
 import { NextResponse } from "next/server";
 import dbConnect from "@/backend/config/dbConnect";
@@ -12,15 +12,14 @@ import {
 } from "@/lib/auth-utils";
 
 /**
- * GET /api/orders/can_review/[id]
- * Vérifie si un utilisateur peut laisser un avis sur un produit
- * Condition: L'utilisateur doit avoir commandé le produit
- * Rate limit: Configuration intelligente - authenticatedRead (200 req/min)
+ * GET /api/v1/orders/can_review/[id]
+ * Version mobile : vérifie si l'utilisateur peut laisser un avis sur un
+ * produit (condition : l'avoir commandé).
+ * Rate limit: authenticatedRead (200 req/min)
  */
 export const GET = withIntelligentRateLimit(
   async function (req, { params }) {
     try {
-      // Validation de l'ID du produit
       const { id } = await params;
       if (!id || !/^[0-9a-fA-F]{24}$/.test(id)) {
         return NextResponse.json(
@@ -33,13 +32,10 @@ export const GET = withIntelligentRateLimit(
         );
       }
 
-      // Vérifier l'authentification (Better Auth)
       const authUser = await isAuthenticatedUser();
 
-      // Connexion DB
       await dbConnect();
 
-      // Vérifier que le produit existe
       const product = await Product.findById(id).select("_id name isActive");
       if (!product) {
         return NextResponse.json(
@@ -52,7 +48,6 @@ export const GET = withIntelligentRateLimit(
         );
       }
 
-      // Vérifier si le produit est actif
       if (!product.isActive) {
         return NextResponse.json(
           {
@@ -67,17 +62,13 @@ export const GET = withIntelligentRateLimit(
         );
       }
 
-      // Chercher les commandes de l'utilisateur contenant ce produit
-      // ✅ authUser.id est castée automatiquement en ObjectId par Mongoose
       const orders = await Order.find({
         "user.userId": authUser.id,
         "orderItems.product": id,
       }).lean();
 
-      // Vérifier si l'utilisateur a commandé le produit
       const canReview = orders && orders.length > 0;
 
-      // Log pour audit (optionnel, en dev seulement)
       if (process.env.NODE_ENV === "development") {
         console.log("Can review check:", {
           userId: authUser.id,
@@ -106,12 +97,11 @@ export const GET = withIntelligentRateLimit(
         error.message?.includes("authentication") ||
         error.message === "Authentication required";
 
-      // Capturer les erreurs non-validation
       if (error.name !== "CastError" && !isAuthError) {
         captureException(error, {
           tags: {
             component: "api",
-            route: "orders/can_review/[id]/GET",
+            route: "v1/orders/can_review/[id]/GET",
           },
           extra: {
             errorName: error.name,

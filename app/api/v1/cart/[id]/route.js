@@ -1,4 +1,4 @@
-// app/api/cart/[id]/route.js
+// app/api/v1/cart/[id]/route.js
 
 import { NextResponse } from "next/server";
 import dbConnect from "@/backend/config/dbConnect";
@@ -14,20 +14,17 @@ import {
 } from "@/lib/auth-utils";
 
 /**
- * DELETE /api/cart/[id]
- * Supprime un élément du panier
- * Rate limit: Configuration intelligente - cart.remove (50 req/min, ultra permissif, pas de blocage)
- *
- * Headers de sécurité gérés par next.config.mjs pour /api/cart/*
+ * DELETE /api/v1/cart/[id]
+ * Version mobile : supprime un élément du panier.
+ * Rate limit: cart.remove (50 req/min, ultra permissif, pas de blocage)
  */
 export const DELETE = withCartRateLimit(
   async function (req, context) {
     let id;
     try {
-      // ✅ Next.js 15 : params est une Promise dans les route handlers
+      // Next.js 15 : params est une Promise dans les route handlers
       ({ id } = await context.params);
 
-      // Validation de l'ID
       if (!id || !/^[0-9a-fA-F]{24}$/.test(id)) {
         return NextResponse.json(
           {
@@ -39,13 +36,10 @@ export const DELETE = withCartRateLimit(
         );
       }
 
-      // Vérifier l'authentification (Better Auth)
       const user = await isAuthenticatedUser();
 
-      // Connexion DB
       await dbConnect();
 
-      // Vérifier que l'élément existe avec plus de détails
       const cartItem = await Cart.findById(id).populate(
         "product",
         "name price",
@@ -62,9 +56,7 @@ export const DELETE = withCartRateLimit(
         );
       }
 
-      // Vérifier la propriété
       if (cartItem.user.toString() !== user.id.toString()) {
-        // Log de sécurité pour tentative de suppression non autorisée
         console.warn("🚨 Unauthorized cart deletion attempt:", {
           userId: user.id,
           cartItemId: id,
@@ -85,7 +77,6 @@ export const DELETE = withCartRateLimit(
         );
       }
 
-      // Stocker les informations pour le log avant suppression
       const deletedItemInfo = {
         productId: cartItem.product?._id,
         productName: cartItem.product?.name,
@@ -93,16 +84,13 @@ export const DELETE = withCartRateLimit(
         price: cartItem.product?.price,
       };
 
-      // Supprimer l'élément
       await Cart.findByIdAndDelete(id);
 
-      // Récupérer le panier mis à jour avec les produits populés
       const cartItems = await Cart.find({ user: user.id })
         .populate("product", "name price stock images isActive")
         .sort({ createdAt: -1 })
         .lean();
 
-      // Filtrer et formater la réponse avec vérifications améliorées
       const formattedCart = cartItems
         .filter((item) => {
           return (
@@ -137,7 +125,6 @@ export const DELETE = withCartRateLimit(
         0,
       );
 
-      // Log de sécurité pour audit
       console.log("🔒 Security event - Cart item deleted:", {
         userId: user.id,
         cartItemId: id,
@@ -185,7 +172,7 @@ export const DELETE = withCartRateLimit(
         captureException(error, {
           tags: {
             component: "api",
-            route: "cart/[id]/DELETE",
+            route: "v1/cart/[id]/DELETE",
             cartItemId: id,
           },
         });
@@ -233,18 +220,17 @@ export const DELETE = withCartRateLimit(
 );
 
 /**
- * GET /api/cart/[id]
- * Récupère un élément spécifique du panier
- * Rate limit: Configuration intelligente - authenticatedRead (200 req/min)
+ * GET /api/v1/cart/[id]
+ * Version mobile : récupère un élément spécifique du panier.
+ * Rate limit: authenticatedRead (200 req/min)
  */
 export const GET = withIntelligentRateLimit(
   async function (req, context) {
     let id;
     try {
-      // ✅ Next.js 15 : params est une Promise dans les route handlers
+      // Next.js 15 : params est une Promise dans les route handlers
       ({ id } = await context.params);
 
-      // Validation de l'ID
       if (!id || !/^[0-9a-fA-F]{24}$/.test(id)) {
         return NextResponse.json(
           {
@@ -256,13 +242,10 @@ export const GET = withIntelligentRateLimit(
         );
       }
 
-      // Vérifier l'authentification (Better Auth)
       const user = await isAuthenticatedUser();
 
-      // Connexion DB
       await dbConnect();
 
-      // Récupérer l'élément du panier avec le produit
       const cartItem = await Cart.findOne({
         _id: id,
         user: user.id,
@@ -281,7 +264,6 @@ export const GET = withIntelligentRateLimit(
         );
       }
 
-      // Vérifier si le produit est toujours disponible
       if (!cartItem.product || !cartItem.product.isActive) {
         return NextResponse.json(
           {
@@ -293,7 +275,6 @@ export const GET = withIntelligentRateLimit(
         );
       }
 
-      // Formater la réponse
       const adjustedQuantity = Math.min(
         cartItem.quantity,
         cartItem.product.stock,
@@ -339,7 +320,7 @@ export const GET = withIntelligentRateLimit(
         captureException(error, {
           tags: {
             component: "api",
-            route: "cart/[id]/GET",
+            route: "v1/cart/[id]/GET",
             cartItemId: id,
           },
         });

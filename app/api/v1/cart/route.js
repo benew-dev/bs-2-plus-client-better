@@ -1,4 +1,4 @@
-// app/api/cart/route.js
+// app/api/v1/cart/route.js
 
 import { NextResponse } from "next/server";
 import dbConnect from "@/backend/config/dbConnect";
@@ -13,33 +13,26 @@ import {
 } from "@/lib/auth-utils";
 
 /**
- * GET /api/cart
- * Récupère le panier de l'utilisateur connecté
- * Rate limit: Configuration intelligente - authenticatedRead (200 req/min pour utilisateurs authentifiés)
- *
- * Headers de sécurité gérés par next.config.mjs pour /api/cart/*
+ * GET /api/v1/cart
+ * Version mobile : récupère le panier de l'utilisateur connecté.
+ * Rate limit: authenticatedRead (200 req/min)
  */
 export const GET = withIntelligentRateLimit(
   async function (req) {
     try {
-      // Vérifier l'authentification (Better Auth)
       const user = await isAuthenticatedUser();
 
-      // Connexion DB
       await dbConnect();
 
-      // Récupérer le panier avec les produits populés
       const cartItems = await Cart.find({ user: user.id })
         .populate("product", "name price stock images isActive")
         .lean();
 
-      // Filtrer les produits disponibles et ajuster les quantités
       const validCartItems = cartItems.filter(
         (item) =>
           item.product && item.product.isActive && item.product.stock > 0,
       );
 
-      // Ajuster les quantités si elles dépassent le stock
       const formattedCart = validCartItems.map((item) => {
         const quantity = Math.min(item.quantity, item.product.stock);
         const subtotal = quantity * item.product.price;
@@ -92,7 +85,7 @@ export const GET = withIntelligentRateLimit(
         captureException(error, {
           tags: {
             component: "api",
-            route: "cart/GET",
+            route: "v1/cart/GET",
           },
         });
       }
@@ -117,20 +110,17 @@ export const GET = withIntelligentRateLimit(
 );
 
 /**
- * POST /api/cart
- * Ajoute un produit au panier
- * Rate limit: Configuration intelligente - cart.add (100 req/min, ultra permissif)
+ * POST /api/v1/cart
+ * Version mobile : ajoute un produit au panier.
+ * Rate limit: cart.add (100 req/min, ultra permissif)
  */
 export const POST = withCartRateLimit(
   async function (req) {
     try {
-      // Vérifier l'authentification (Better Auth)
       const user = await isAuthenticatedUser();
 
-      // Connexion DB
       await dbConnect();
 
-      // Parser les données
       let body;
       try {
         body = await req.json();
@@ -147,7 +137,6 @@ export const POST = withCartRateLimit(
 
       const { productId, quantity = 1 } = body;
 
-      // Validation basique
       if (!productId || !/^[0-9a-fA-F]{24}$/.test(productId)) {
         return NextResponse.json(
           {
@@ -171,7 +160,6 @@ export const POST = withCartRateLimit(
         );
       }
 
-      // Vérifier le produit
       const product = await Product.findById(productId)
         .select("name price stock isActive")
         .lean();
@@ -221,7 +209,6 @@ export const POST = withCartRateLimit(
         );
       }
 
-      // Vérifier si le produit est déjà dans le panier
       const existingCartItem = await Cart.findOne({
         user: user.id,
         product: productId,
@@ -231,7 +218,6 @@ export const POST = withCartRateLimit(
       let isNewItem = false;
 
       if (existingCartItem) {
-        // Mettre à jour la quantité
         const newQuantity = Math.min(
           existingCartItem.quantity + quantity,
           product.stock,
@@ -241,7 +227,6 @@ export const POST = withCartRateLimit(
         await existingCartItem.save();
         updatedItem = existingCartItem;
       } else {
-        // Créer un nouvel item
         isNewItem = true;
         updatedItem = await Cart.create({
           user: user.id,
@@ -252,12 +237,10 @@ export const POST = withCartRateLimit(
         });
       }
 
-      // Récupérer le panier mis à jour
       const cartItems = await Cart.find({ user: user.id })
         .populate("product", "name price stock images isActive")
         .lean();
 
-      // Formater la réponse
       const formattedCart = cartItems
         .filter((item) => item.product && item.product.isActive)
         .map((item) => ({
@@ -277,7 +260,6 @@ export const POST = withCartRateLimit(
         0,
       );
 
-      // Log de sécurité pour audit
       console.log("🔒 Security event - Cart item added:", {
         userId: user.id,
         productId,
@@ -319,7 +301,7 @@ export const POST = withCartRateLimit(
         captureException(error, {
           tags: {
             component: "api",
-            route: "cart/POST",
+            route: "v1/cart/POST",
           },
         });
       }
@@ -348,20 +330,17 @@ export const POST = withCartRateLimit(
 );
 
 /**
- * PUT /api/cart
- * Met à jour la quantité d'un produit dans le panier
- * Rate limit: Configuration intelligente - cart.update (100 req/min, ultra permissif)
+ * PUT /api/v1/cart
+ * Version mobile : met à jour la quantité d'un produit dans le panier.
+ * Rate limit: cart.update (100 req/min, ultra permissif)
  */
 export const PUT = withCartRateLimit(
   async function (req) {
     try {
-      // Vérifier l'authentification (Better Auth)
       const user = await isAuthenticatedUser();
 
-      // Connexion DB
       await dbConnect();
 
-      // Parser les données
       let body;
       try {
         body = await req.json();
@@ -379,7 +358,6 @@ export const PUT = withCartRateLimit(
       const cartItemId = body.product?.id;
       const action = body.value;
 
-      // Validation
       if (!cartItemId || !/^[0-9a-fA-F]{24}$/.test(cartItemId)) {
         return NextResponse.json(
           {
@@ -403,7 +381,6 @@ export const PUT = withCartRateLimit(
         );
       }
 
-      // Récupérer l'item du panier
       const cartItem = await Cart.findOne({
         _id: cartItemId,
         user: user.id,
@@ -420,7 +397,6 @@ export const PUT = withCartRateLimit(
         );
       }
 
-      // Vérifier que le produit est toujours disponible
       if (!cartItem.product || !cartItem.product.isActive) {
         await Cart.findByIdAndDelete(cartItemId);
 
@@ -435,11 +411,9 @@ export const PUT = withCartRateLimit(
         );
       }
 
-      // Variables pour le log
       const previousQuantity = cartItem.quantity;
       let itemDeleted = false;
 
-      // Mettre à jour la quantité
       if (action === INCREASE) {
         const newQuantity = cartItem.quantity + 1;
 
@@ -472,12 +446,10 @@ export const PUT = withCartRateLimit(
         }
       }
 
-      // Récupérer le panier mis à jour
       const cartItems = await Cart.find({ user: user.id })
         .populate("product", "name price stock images isActive")
         .lean();
 
-      // Formater la réponse
       const formattedCart = cartItems
         .filter((item) => item.product && item.product.isActive)
         .map((item) => ({
@@ -497,7 +469,6 @@ export const PUT = withCartRateLimit(
         0,
       );
 
-      // Log de sécurité pour audit
       console.log("🔒 Security event - Cart quantity updated:", {
         userId: user.id,
         cartItemId,
@@ -546,7 +517,7 @@ export const PUT = withCartRateLimit(
         captureException(error, {
           tags: {
             component: "api",
-            route: "cart/PUT",
+            route: "v1/cart/PUT",
           },
         });
       }

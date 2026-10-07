@@ -1,4 +1,4 @@
-// app/api/auth/me/update/route.js
+// app/api/v1/me/update/route.js
 
 import { NextResponse } from "next/server";
 import { headers } from "next/headers";
@@ -12,16 +12,14 @@ import {
 } from "@/lib/auth-utils";
 
 /**
- * PUT /api/auth/me/update
- * Met à jour le profil utilisateur AVEC adresse via Better Auth
- * Rate limit: Configuration intelligente - api.write (30 req/min pour utilisateurs authentifiés)
- *
- * Headers de sécurité gérés par next.config.mjs pour /api/auth/*
+ * PUT /api/v1/me/update
+ * Version mobile : met à jour le profil utilisateur (phone + adresse)
+ * via Better Auth.
+ * Rate limit: api.write (30 req/min pour utilisateurs authentifiés)
  */
 export const PUT = withIntelligentRateLimit(
   async function (req) {
     try {
-      // Vérifier l'authentification
       const user = await isAuthenticatedUser();
 
       if (!user) {
@@ -35,7 +33,6 @@ export const PUT = withIntelligentRateLimit(
         );
       }
 
-      // 2. Vérifier que le compte est actif
       if (user.isActive === false) {
         return NextResponse.json(
           { success: false, message: "Account is deactivated" },
@@ -43,7 +40,6 @@ export const PUT = withIntelligentRateLimit(
         );
       }
 
-      // 3. Parser le body
       let profileData;
       try {
         profileData = await req.json();
@@ -54,7 +50,6 @@ export const PUT = withIntelligentRateLimit(
         );
       }
 
-      // 4. Validation avec Yup (UNIQUEMENT phone + adresse)
       const validation = await validateProfileContact(profileData);
 
       if (!validation.isValid) {
@@ -68,7 +63,6 @@ export const PUT = withIntelligentRateLimit(
         );
       }
 
-      // 5. Préparer les données à mettre à jour
       const allowedFields = ["phone", "address"];
       const updateData = {};
 
@@ -87,7 +81,6 @@ export const PUT = withIntelligentRateLimit(
 
       const auth = await getAuth();
 
-      // 6. Mise à jour via Better Auth API
       const updatedUser = await auth.api.updateUser({
         body: updateData,
         headers: await headers(),
@@ -100,16 +93,14 @@ export const PUT = withIntelligentRateLimit(
         );
       }
 
-      // ✅ NOUVEAU : INVALIDER LE CACHE EN RÉCUPÉRANT LA SESSION SANS CACHE
+      // Invalider le cache de session en le récupérant sans cache
       await auth.api.getSession({
         query: {
-          disableCookieCache: true, // ✅ Force le refresh du cache
+          disableCookieCache: true,
         },
         headers: await headers(),
       });
 
-      // ✅ NOUVEAU : Invalider le cache de session Better Auth
-      // Créer une nouvelle réponse avec un header spécial
       const response = NextResponse.json(
         {
           success: true,
@@ -130,16 +121,32 @@ export const PUT = withIntelligentRateLimit(
         { status: 200 },
       );
 
-      // ✅ Ajouter un header pour signaler au client de rafraîchir
       response.headers.set("X-Session-Updated", "true");
 
       return response;
     } catch (error) {
       console.error("Profile update error:", error.message);
 
+      // NOUVEAU (absent du fichier source) : détection explicite de
+      // l'erreur d'authentification, par cohérence avec les autres routes
+      // v1 — sans ça, un appel non authentifié retombe en 500 au lieu de 401.
+      if (
+        error.message?.includes("authentication") ||
+        error.message === "Authentication required"
+      ) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: "Authentication failed",
+            code: "AUTH_FAILED",
+          },
+          { status: 401 },
+        );
+      }
+
       if (error.name !== "ValidationError") {
         captureException(error, {
-          tags: { component: "api", route: "auth/me/update" },
+          tags: { component: "api", route: "v1/me/update" },
         });
       }
 

@@ -1,4 +1,4 @@
-// app/api/orders/webhook/route.js
+// app/api/v1/orders/webhook/route.js
 
 import { NextResponse } from "next/server";
 import dbConnect from "@/backend/config/dbConnect";
@@ -14,13 +14,17 @@ import {
 } from "@/lib/auth-utils";
 import { ObjectId } from "mongodb";
 
+/**
+ * POST /api/v1/orders/webhook
+ * Version mobile : crée une commande (transaction : vérification du
+ * stock, décrément, nettoyage du panier).
+ */
 export const POST = withIntelligentRateLimit(
   async function (req) {
     try {
-      // 1. Authentification (Better Auth)
       const authUser = await isAuthenticatedUser();
 
-      // 2. Connexion DB — collection native Better Auth ("user", pas le modèle Mongoose)
+      // Collection native Better Auth ("user", pas le modèle Mongoose)
       const mongooseInstance = await dbConnect();
       const db = mongooseInstance.connection.getClient().db();
 
@@ -49,7 +53,6 @@ export const POST = withIntelligentRateLimit(
         );
       }
 
-      // Vérifier si le compte est actif
       if (!user.isActive) {
         console.warn("Inactive user attempting to place order:", user.email);
         return NextResponse.json(
@@ -62,7 +65,6 @@ export const POST = withIntelligentRateLimit(
         );
       }
 
-      // 4. Parser et valider les données de commande
       let orderData;
       try {
         orderData = await req.json();
@@ -77,7 +79,6 @@ export const POST = withIntelligentRateLimit(
         );
       }
 
-      // Validation basique des champs requis
       if (!orderData?.orderItems?.length) {
         return NextResponse.json(
           {
@@ -100,7 +101,6 @@ export const POST = withIntelligentRateLimit(
         );
       }
 
-      // Validation du paiement
       const { typePayment, paymentAccountNumber, paymentAccountName } =
         orderData.paymentInfo || {};
 
@@ -134,7 +134,6 @@ export const POST = withIntelligentRateLimit(
           "Le paiement sera effectué en espèces à la livraison";
       }
 
-      // 5. Vérifier le stock et traiter la commande en transaction
       const session = await Order.startSession();
 
       try {
@@ -241,7 +240,7 @@ export const POST = withIntelligentRateLimit(
             delete item.cartId;
           });
 
-          // ✅ Construire l'objet utilisateur avec les données Better Auth
+          // Construire l'objet utilisateur avec les données Better Auth
           orderData.user = {
             userId: authUser.id,
             name: user.name,
@@ -275,13 +274,11 @@ export const POST = withIntelligentRateLimit(
           return order[0];
         });
 
-        // Transaction réussie - Récupérer la commande complète
         const order = await Order.findOne({ "user.userId": authUser.id })
           .sort({ createdAt: -1 })
           .select("_id orderNumber totalAmount")
           .lean();
 
-        // Log de sécurité pour audit
         console.log("🔒 Security event - Order created:", {
           userId: authUser.id,
           userEmail: user.email,
@@ -355,7 +352,7 @@ export const POST = withIntelligentRateLimit(
         captureException(error, {
           tags: {
             component: "api",
-            route: "orders/webhook/POST",
+            route: "v1/orders/webhook/POST",
             critical: true,
           },
           level: "error",

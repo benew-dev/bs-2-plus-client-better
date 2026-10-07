@@ -1,4 +1,4 @@
-// app/api/auth/me/update_password/route.js
+// app/api/v1/me/update_password/route.js
 
 import { NextResponse } from "next/server";
 import { headers } from "next/headers";
@@ -13,18 +13,15 @@ import {
 } from "@/lib/auth-utils";
 
 /**
- * PUT /api/auth/me/update_password
- * Met à jour le mot de passe utilisateur avec sécurité renforcée via Better Auth
- * Rate limit: Configuration intelligente personnalisée (3 tentatives par heure, strict)
- *
- * Headers de sécurité gérés par next.config.mjs pour /api/auth/*
+ * PUT /api/v1/me/update_password
+ * Version mobile : met à jour le mot de passe utilisateur, avec
+ * verrouillage de compte après tentatives échouées (Better Auth).
+ * Rate limit: 3 tentatives par heure, strict
  */
 export const PUT = withIntelligentRateLimit(
   async function (req) {
     try {
-      // 1. Authentification avec Better Auth
       const auth = await getAuth();
-      // Vérifier l'authentification
       const user = await isAuthenticatedUser();
 
       if (!user) {
@@ -38,7 +35,6 @@ export const PUT = withIntelligentRateLimit(
         );
       }
 
-      // 2. Parser les données
       let passwordData;
       try {
         passwordData = await req.json();
@@ -53,7 +49,6 @@ export const PUT = withIntelligentRateLimit(
         );
       }
 
-      // 3. Validation avec Yup
       const validation = await validatePasswordUpdate({
         currentPassword: passwordData.currentPassword,
         newPassword: passwordData.newPassword,
@@ -72,11 +67,9 @@ export const PUT = withIntelligentRateLimit(
         );
       }
 
-      // 4. Connexion DB pour vérifier le verrouillage
       const mongooseInstance = await dbConnect();
       const db = mongooseInstance.connection.getClient().db();
 
-      // Récupérer l'utilisateur depuis MongoDB pour vérifier le verrouillage
       const userDoc = await db.collection("user").findOne({ id: user.id });
 
       if (!userDoc) {
@@ -90,7 +83,6 @@ export const PUT = withIntelligentRateLimit(
         );
       }
 
-      // 5. Vérifier si le compte est actif
       if (userDoc.isActive === false) {
         console.log(
           "Password change attempt on suspended account:",
@@ -106,7 +98,6 @@ export const PUT = withIntelligentRateLimit(
         );
       }
 
-      // 6. Vérifier si le compte est verrouillé
       const isLocked =
         userDoc.lockUntil && new Date(userDoc.lockUntil) > new Date();
 
@@ -125,21 +116,18 @@ export const PUT = withIntelligentRateLimit(
         );
       }
 
-      // 7. Changer le mot de passe via Better Auth
       const result = await auth.api.changePassword({
         body: {
           currentPassword: validation.data.currentPassword,
           newPassword: validation.data.newPassword,
-          revokeOtherSessions: true, // Déconnecter les autres sessions
+          revokeOtherSessions: true,
         },
         headers: await headers(),
       });
 
-      // 8. Gérer l'échec du changement de mot de passe
       if (!result || result.error) {
         console.log("Invalid current password attempt:", user.email);
 
-        // Incrémenter les tentatives échouées
         const MAX_LOGIN_ATTEMPTS = 5;
         const LOCK_TIME = 30 * 60 * 1000; // 30 minutes
 
@@ -176,7 +164,6 @@ export const PUT = withIntelligentRateLimit(
         );
       }
 
-      // 9. Succès - Réinitialiser les tentatives échouées
       await db.collection("user").updateOne(
         { id: user.id },
         {
@@ -193,7 +180,6 @@ export const PUT = withIntelligentRateLimit(
         timestamp: new Date().toISOString(),
       });
 
-      // 10. Log de sécurité pour audit
       console.log("🔒 Security event - Password changed:", {
         userId: user.id,
         email: user.email,
@@ -205,7 +191,6 @@ export const PUT = withIntelligentRateLimit(
           "unknown",
       });
 
-      // 11. Réponse de succès
       return NextResponse.json(
         {
           success: true,
@@ -222,7 +207,6 @@ export const PUT = withIntelligentRateLimit(
     } catch (error) {
       console.error("❌ Password update error:", error.message);
 
-      // Gestion d'erreur spécifique
       if (error.name === "ValidationError") {
         const validationErrors = {};
         Object.keys(error.errors).forEach((key) => {
@@ -240,13 +224,12 @@ export const PUT = withIntelligentRateLimit(
         );
       }
 
-      // Capturer les vraies erreurs système
       if (
         !error.message?.includes("bcrypt") &&
         !error.message?.includes("Invalid current password")
       ) {
         captureException(error, {
-          tags: { component: "api", route: "auth/me/update_password" },
+          tags: { component: "api", route: "v1/me/update_password" },
           user: { id: req.user?.id, email: req.user?.email },
           level: "error",
         });

@@ -1,4 +1,4 @@
-// app/api/orders/me/route.js
+// app/api/v1/orders/me/route.js
 
 import { NextResponse } from "next/server";
 import dbConnect from "@/backend/config/dbConnect";
@@ -13,31 +13,17 @@ import {
 import { ObjectId } from "mongodb";
 
 /**
- * GET /api/orders/me
- * Récupère l'historique des commandes de l'utilisateur connecté
- * Rate limit: Configuration intelligente - authenticatedRead (200 req/min)
- *
- * Support des paiements:
- * - Paiements électroniques (WAAFI, D-MONEY, CAC-PAY, BCI-PAY)
- * - Paiement en espèces (CASH) à la livraison
- *
- * Headers de sécurité gérés par next.config.mjs pour /api/orders/* :
- * - Cache-Control: private, no-cache, no-store, must-revalidate
- * - Pragma: no-cache
- * - X-Content-Type-Options: nosniff
- * - X-Robots-Tag: noindex, nofollow
- *
- * Note: Les commandes sont des données sensibles privées
+ * GET /api/v1/orders/me
+ * Version mobile : récupère l'historique des commandes de l'utilisateur
+ * connecté (paiements électroniques et CASH).
+ * Rate limit: authenticatedRead (200 req/min)
  */
 export const GET = withIntelligentRateLimit(
   async function (req) {
     try {
-      // Vérifier l'authentification (Better Auth)
       const authUser = await isAuthenticatedUser();
 
-      console.log("User is connected");
-
-      // Connexion DB — collection native Better Auth ("user", pas le modèle Mongoose)
+      // Collection native Better Auth ("user", pas le modèle Mongoose)
       const mongooseInstance = await dbConnect();
       const db = mongooseInstance.connection.getClient().db();
 
@@ -64,7 +50,6 @@ export const GET = withIntelligentRateLimit(
         );
       }
 
-      // Vérifier si le compte est actif
       if (!user.isActive) {
         console.warn(
           "Inactive user attempting to access order history:",
@@ -80,12 +65,10 @@ export const GET = withIntelligentRateLimit(
         );
       }
 
-      // Récupérer et valider les paramètres de pagination
       const searchParams = req.nextUrl.searchParams;
       const page = parseInt(searchParams.get("page") || "1", 10);
-      const resPerPage = 2; // 2 commandes par page
+      const resPerPage = 2;
 
-      // Validation des paramètres de pagination
       if (page < 1 || page > 1000) {
         return NextResponse.json(
           {
@@ -98,8 +81,6 @@ export const GET = withIntelligentRateLimit(
         );
       }
 
-      // Compter le total de commandes avec les filtres
-      // ✅ authUser.id est castée automatiquement en ObjectId par Mongoose
       const ordersCount = await Order.countDocuments({
         "user.userId": authUser.id,
       });
@@ -114,16 +95,13 @@ export const GET = withIntelligentRateLimit(
         paymentStatus: "unpaid",
       });
 
-      // Compter les commandes en espèces (CASH)
       const ordersCashCount = await Order.countDocuments({
         "user.userId": authUser.id,
         "paymentInfo.typePayment": "CASH",
       });
 
-      // Total de toutes les commandes d'un utilisateur (tous statuts confondus)
       const totalAmountOrders = await Order.getTotalAmountByUser(authUser.id);
 
-      // Si aucune commande trouvée
       if (ordersCount === 0) {
         return NextResponse.json(
           {
@@ -149,13 +127,11 @@ export const GET = withIntelligentRateLimit(
         );
       }
 
-      // Utiliser APIFilters pour la pagination
       const apiFilters = new APIFilters(
         Order.find({ "user.userId": authUser.id }),
         searchParams,
       ).pagination(resPerPage);
 
-      // Récupérer les commandes avec pagination
       const orders = await apiFilters.query
         .select(
           "orderNumber user paymentInfo paymentStatus totalAmount createdAt updatedAt paidAt cancelledAt cancelReason orderItems",
@@ -163,10 +139,8 @@ export const GET = withIntelligentRateLimit(
         .sort({ createdAt: -1 })
         .lean();
 
-      // Calculer le nombre de pages
       const totalPages = Math.ceil(ordersCount / resPerPage);
 
-      // Log pour audit (sans données sensibles)
       console.log("Order history accessed:", {
         userId: authUser.id,
         userEmail: user.email,
@@ -206,12 +180,11 @@ export const GET = withIntelligentRateLimit(
         error.message?.includes("authentication") ||
         error.message === "Authentication required";
 
-      // Capturer seulement les vraies erreurs système
       if (!isAuthError) {
         captureException(error, {
           tags: {
             component: "api",
-            route: "orders/me/GET",
+            route: "v1/orders/me/GET",
           },
           extra: {
             page: req.nextUrl.searchParams.get("page"),
@@ -219,7 +192,6 @@ export const GET = withIntelligentRateLimit(
         });
       }
 
-      // Gestion détaillée des erreurs
       let status = 500;
       let message = "Failed to fetch orders history";
       let code = "INTERNAL_ERROR";

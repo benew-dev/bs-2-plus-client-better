@@ -1,4 +1,4 @@
-// app/api/auth/me/update/sign-cloudinary-params/route.js
+// app/api/v1/me/update/sign-cloudinary-params/route.js
 
 import { NextResponse } from "next/server";
 import cloudinary from "cloudinary";
@@ -10,7 +10,6 @@ import {
   isAuthenticatedUser,
 } from "@/lib/auth-utils";
 
-// Configuration Cloudinary
 cloudinary.config({
   cloud_name: process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME,
   api_key: process.env.NEXT_PUBLIC_CLOUDINARY_API_KEY,
@@ -19,16 +18,15 @@ cloudinary.config({
 });
 
 /**
- * POST /api/auth/me/update/sign-cloudinary-params
- * Signe les paramètres pour l'upload Cloudinary sécurisé
- * Rate limit: Configuration intelligente - api.upload (10 req/5min, strict)
- *
- * Headers de sécurité gérés par next.config.mjs pour /api/auth/*
+ * POST /api/v1/me/update/sign-cloudinary-params
+ * Version mobile : signe les paramètres pour l'upload Cloudinary sécurisé
+ * (avatar depuis l'app Expo, upload direct via l'API REST Cloudinary avec
+ * la signature retournée).
+ * Rate limit: api.upload (10 req/5min, strict)
  */
 export const POST = withIntelligentRateLimit(
   async function (req) {
     try {
-      // 1. Vérifier les variables d'environnement
       if (
         !process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME ||
         !process.env.NEXT_PUBLIC_CLOUDINARY_API_KEY ||
@@ -36,7 +34,7 @@ export const POST = withIntelligentRateLimit(
       ) {
         captureMessage("Cloudinary configuration missing", {
           level: "error",
-          tags: { component: "api", route: "sign-cloudinary-params" },
+          tags: { component: "api", route: "v1/sign-cloudinary-params" },
         });
 
         return NextResponse.json(
@@ -48,7 +46,6 @@ export const POST = withIntelligentRateLimit(
         );
       }
 
-      // Vérifier l'authentification
       const user = await isAuthenticatedUser();
 
       if (!user) {
@@ -62,7 +59,6 @@ export const POST = withIntelligentRateLimit(
         );
       }
 
-      // 3. Vérifier que le compte est actif
       if (user.isActive === false) {
         return NextResponse.json(
           {
@@ -73,10 +69,8 @@ export const POST = withIntelligentRateLimit(
         );
       }
 
-      // 4. Connexion DB (pour logging/vérifications supplémentaires si nécessaire)
       await dbConnect();
 
-      // 5. Parser et valider le body
       let body;
       try {
         body = await req.json();
@@ -90,7 +84,6 @@ export const POST = withIntelligentRateLimit(
         );
       }
 
-      // 6. Valider la présence de paramsToSign
       if (
         !body ||
         !body.paramsToSign ||
@@ -107,10 +100,8 @@ export const POST = withIntelligentRateLimit(
 
       const { paramsToSign } = body;
 
-      // 7. Configuration du dossier et restrictions
       paramsToSign.folder = "buyitnow/avatars";
 
-      // 8. Générer la signature
       let signature;
       try {
         signature = cloudinary.utils.api_sign_request(
@@ -123,7 +114,7 @@ export const POST = withIntelligentRateLimit(
         captureException(error, {
           tags: {
             component: "api",
-            route: "sign-cloudinary-params",
+            route: "v1/sign-cloudinary-params",
             action: "signature_generation",
           },
           extra: {
@@ -140,7 +131,6 @@ export const POST = withIntelligentRateLimit(
         );
       }
 
-      // 9. Logger l'activité (sans données sensibles)
       if (process.env.NODE_ENV === "production") {
         console.info("Cloudinary signature generated", {
           userId: user.id.toString().substring(0, 8) + "...",
@@ -155,7 +145,6 @@ export const POST = withIntelligentRateLimit(
         });
       }
 
-      // 10. Retourner la signature avec les paramètres nécessaires
       return NextResponse.json(
         {
           success: true,
@@ -173,18 +162,33 @@ export const POST = withIntelligentRateLimit(
     } catch (error) {
       console.error("Sign cloudinary params error:", error);
 
-      // Capturer l'erreur dans Sentry
+      // NOUVEAU (absent du fichier source) : détection explicite de
+      // l'erreur d'authentification, par cohérence avec les autres routes
+      // v1 — sans ça, un appel non authentifié retombe en 500 au lieu de 401.
+      if (
+        error.message?.includes("authentication") ||
+        error.message === "Authentication required"
+      ) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: "Authentication failed",
+            code: "AUTH_FAILED",
+          },
+          { status: 401 },
+        );
+      }
+
       captureException(error, {
         tags: {
           component: "api",
-          route: "sign-cloudinary-params",
+          route: "v1/sign-cloudinary-params",
         },
         extra: {
           errorName: error.name,
         },
       });
 
-      // Retourner une erreur générique en production
       const errorMessage =
         process.env.NODE_ENV === "production"
           ? "Something went wrong"

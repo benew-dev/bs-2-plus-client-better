@@ -1,4 +1,4 @@
-// app/api/auth/me/favorites/route.js
+// app/api/v1/me/favorites/route.js
 
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
@@ -13,21 +13,20 @@ import {
 } from "@/lib/auth-utils";
 
 /**
- * POST /api/auth/me/favorites
- * Ajoute ou retire un produit des favoris de l'utilisateur
- * Rate limit: Configuration intelligente - api.write (30 req/min pour utilisateurs authentifiés)
+ * POST /api/v1/me/favorites
+ * Version mobile : ajoute ou retire un produit des favoris de l'utilisateur.
+ * Rate limit: api.write (30 req/min pour utilisateurs authentifiés)
  */
 export const POST = withIntelligentRateLimit(
   async function (req) {
     try {
-      // Vérifier l'authentification (Better Auth)
       const authUser = await isAuthenticatedUser();
 
-      // Connexion DB — collection native Better Auth ("user", pas le modèle Mongoose "users")
+      // Collection native Better Auth ("user", pas le modèle Mongoose "users")
       const mongooseInstance = await dbConnect();
       const db = mongooseInstance.connection.getClient().db();
 
-      // ✅ Le document brut utilise _id (ObjectId), pas un champ "id" séparé
+      // Le document brut utilise _id (ObjectId), pas un champ "id" séparé
       const userObjectId = new ObjectId(authUser.id);
 
       const userDoc = await db
@@ -63,7 +62,6 @@ export const POST = withIntelligentRateLimit(
         );
       }
 
-      // Parser les données
       let body;
       try {
         body = await req.json();
@@ -117,7 +115,6 @@ export const POST = withIntelligentRateLimit(
         );
       }
 
-      // Vérifier que le produit existe et est actif
       const product = await Product.findById(productId)
         .select("_id name isActive images")
         .lean();
@@ -234,7 +231,7 @@ export const POST = withIntelligentRateLimit(
         );
       }
 
-      // ✅ Écriture directe dans la collection native "user" (Better Auth), via _id
+      // Écriture directe dans la collection native "user" (Better Auth), via _id
       const updateResult = await db.collection("user").updateOne(
         { _id: userObjectId },
         {
@@ -245,7 +242,6 @@ export const POST = withIntelligentRateLimit(
         },
       );
 
-      // ✅ Vérification explicite que l'écriture a bien matché un document
       if (updateResult.matchedCount === 0) {
         console.error(
           "Favorites update matched 0 document for userId:",
@@ -310,7 +306,7 @@ export const POST = withIntelligentRateLimit(
         captureException(error, {
           tags: {
             component: "api",
-            route: "auth/me/favorites",
+            route: "v1/me/favorites",
           },
           level: "error",
         });
@@ -331,7 +327,6 @@ export const POST = withIntelligentRateLimit(
         error.name === "BSONError" ||
         error.message?.includes("ObjectId")
       ) {
-        // ✅ authUser.id n'était pas un ObjectId valide (ex: id généré par Better Auth sous un autre format)
         status = 400;
         message = "Invalid user ID format";
         code = "INVALID_USER_ID_FORMAT";
