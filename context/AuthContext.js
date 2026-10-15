@@ -1,3 +1,5 @@
+// context/AuthContext.js
+
 "use client";
 
 import { useRouter } from "next/navigation";

@@ -1,3 +1,5 @@
+// context/CartContext.js
+
 "use client";
 
 import { createContext, useState, useCallback, useMemo } from "react";

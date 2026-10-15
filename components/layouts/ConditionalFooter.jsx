@@ -1,3 +1,5 @@
+// components/layouts/ConditionalFooter.jsx
+
 "use client";
 
 import { usePathname } from "next/navigation";

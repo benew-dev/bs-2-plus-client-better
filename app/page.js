@@ -1,3 +1,5 @@
+// app/page.js
+
 import Hero from "@/components/home/Hero";
 
 export const metadata = {

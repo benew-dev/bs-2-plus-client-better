@@ -1,3 +1,5 @@
+// components/layouts/Footer.jsx
+
 import Link from "next/link";
 
 const Footer = () => {

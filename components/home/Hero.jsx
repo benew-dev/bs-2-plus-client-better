@@ -1,3 +1,5 @@
+// components/home/Hero.jsx
+
 "use client";
 
 import Link from "next/link";
