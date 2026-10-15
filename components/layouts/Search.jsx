@@ -1,3 +1,5 @@
+// components/layouts/Search.jsx
+
 "use client";
 
 import { useState, useCallback, useRef } from "react";

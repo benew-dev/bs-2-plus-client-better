@@ -1,3 +1,5 @@
+// components/products/ProductItem.jsx
+
 "use client";
 
 import { memo, useCallback, useContext, useMemo, useState } from "react";

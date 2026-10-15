@@ -1,9 +1,11 @@
-'use client';
+// components/layouts/CustomPagination.jsx
 
-import { memo, useState, useCallback, useEffect } from 'react';
-import { useRouter, useSearchParams, usePathname } from 'next/navigation';
-import ResponsivePaginationComponent from 'react-responsive-pagination';
-import 'react-responsive-pagination/themes/classic.css';
+"use client";
+
+import { memo, useState, useCallback, useEffect } from "react";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
+import ResponsivePaginationComponent from "react-responsive-pagination";
+import "react-responsive-pagination/themes/classic.css";
 
 const CustomPagination = memo(({ totalPages = 1 }) => {
   const router = useRouter();
@@ -13,7 +15,7 @@ const CustomPagination = memo(({ totalPages = 1 }) => {
 
   // Calculer le numéro de page actuel de manière sécurisée
   const getCurrentPage = useCallback(() => {
-    const pageParam = searchParams?.get('page');
+    const pageParam = searchParams?.get("page");
     if (!pageParam) return 1;
 
     const parsedPage = parseInt(pageParam, 10);
@@ -51,13 +53,13 @@ const CustomPagination = memo(({ totalPages = 1 }) => {
 
       try {
         // Créer une nouvelle instance de searchParams pour éviter les mutations
-        const params = new URLSearchParams(searchParams?.toString() || '');
+        const params = new URLSearchParams(searchParams?.toString() || "");
 
         if (newPage === 1) {
           // Supprimer le paramètre pour la page 1 (plus propre dans l'URL)
-          params.delete('page');
+          params.delete("page");
         } else {
-          params.set('page', newPage.toString());
+          params.set("page", newPage.toString());
         }
 
         // Construire le chemin
@@ -68,15 +70,15 @@ const CustomPagination = memo(({ totalPages = 1 }) => {
         router.push(path);
 
         // Scroll en haut de page pour une meilleure UX
-        if (typeof window !== 'undefined') {
+        if (typeof window !== "undefined") {
           window.scrollTo({
             top: 0,
-            behavior: 'smooth',
+            behavior: "smooth",
           });
         }
       } catch (error) {
         // Gérer l'erreur et réinitialiser l'état
-        console.error('Erreur de navigation:', error);
+        console.error("Erreur de navigation:", error);
         setIsNavigating(false);
       }
     },
@@ -130,7 +132,7 @@ const CustomPagination = memo(({ totalPages = 1 }) => {
   );
 });
 
-CustomPagination.displayName = 'CustomPagination';
+CustomPagination.displayName = "CustomPagination";
 
 export default CustomPagination;
 

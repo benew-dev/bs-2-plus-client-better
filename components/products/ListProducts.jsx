@@ -1,3 +1,5 @@
+// components/products/ListProducts.jsx
+
 "use client";
 
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";

@@ -1,3 +1,5 @@
+// components/layouts/Filters.jsx
+
 "use client";
 
 import { useState, useCallback, useMemo, useEffect } from "react";

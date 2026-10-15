@@ -1,3 +1,5 @@
+// app/women/page.jsx
+
 import { Suspense, lazy } from "react";
 import ListProductsSkeleton from "@/components/skeletons/ListProductsSkeleton";
 import { parseProductSearchParams } from "@/utils/inputSanitizer";
